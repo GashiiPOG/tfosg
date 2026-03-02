@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Secret Hitler TFO</title>
+<script src="/socket.io/socket.io.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#06050a; --bg2:#0d0b14; --red:#c0182b; --red2:#8b0f1e;
+  --gold:#d4a843; --gold2:#f0c96a; --cream:#ede0c4;
+  --blue:#1a3a7a; --blue2:#2a5ab0; --text:#c8baa0;
+  --muted:rgba(200,186,160,0.45); --glow-red:rgba(192,24,43,0.6);
+  --glow-gold:rgba(212,168,67,0.5); --glow-blue:rgba(42,90,176,0.6);
+  --border:rgba(212,168,67,0.25);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Crimson Pro',serif}
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+.screen{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+.screen.active{display:flex}
+
+/* TITLE */
+#title-screen{background:radial-gradient(ellipse at 50% 40%,rgba(139,15,30,.2) 0%,transparent 60%)}
+.title-logo{text-align:center;margin-bottom:44px;animation:fadeUp 1.2s cubic-bezier(.16,1,.3,1) both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(40px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+.t-tfo{font-family:'Cinzel Decorative',serif;font-size:clamp(.7rem,1.5vw,.9rem);letter-spacing:18px;color:var(--gold);opacity:.8;margin-bottom:10px}
+.t-secret{font-family:'Cinzel Decorative',serif;font-size:clamp(1rem,3vw,2rem);letter-spacing:8px;color:var(--cream);opacity:.55;display:block;margin-bottom:2px}
+.t-main{font-family:'Cinzel Decorative',serif;font-size:clamp(3rem,9vw,7rem);font-weight:900;display:block;line-height:.9;position:relative;color:transparent;background:linear-gradient(180deg,var(--cream) 0%,var(--gold) 50%,var(--red) 100%);-webkit-background-clip:text;background-clip:text;text-shadow:none;filter:drop-shadow(0 0 40px rgba(192,24,43,.7))}
+.t-div{width:280px;height:1px;margin:18px auto;background:linear-gradient(90deg,transparent,var(--gold),transparent);position:relative}
+.t-div::before,.t-div::after{content:'◆';position:absolute;top:50%;transform:translateY(-50%);color:var(--gold);font-size:.55rem}
+.t-div::before{left:28%}.t-div::after{right:28%}
+.t-sub{font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:5px;color:var(--muted);text-transform:uppercase}
+.title-form{display:flex;flex-direction:column;gap:12px;width:min(360px,90vw);animation:fadeUp 1.2s .3s cubic-bezier(.16,1,.3,1) both}
+.ig label{display:block;font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:3px;color:var(--gold);opacity:.7;margin-bottom:6px;text-transform:uppercase}
+.fi{width:100%;background:rgba(0,0,0,.6);border:1px solid var(--border);border-bottom:1px solid rgba(212,168,67,.5);color:var(--cream);padding:12px 16px;font-family:'Crimson Pro',serif;font-size:1.1rem;outline:none;transition:all .3s;letter-spacing:1px}
+.fi:focus{border-color:rgba(212,168,67,.7);background:rgba(212,168,67,.05);box-shadow:0 0 20px rgba(212,168,67,.08)}
+.fi::placeholder{color:rgba(200,186,160,.3)}
+.fi.code{letter-spacing:8px;text-align:center;font-size:1.3rem;text-transform:uppercase}
+.div-or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:.8rem;letter-spacing:2px}
+.div-or::before,.div-or::after{content:'';flex:1;height:1px;background:var(--border)}
+.tbtn{flex:1;position:relative;background:linear-gradient(135deg,rgba(139,15,30,.85),rgba(80,8,18,.95));border:1px solid rgba(192,24,43,.5);color:var(--cream);padding:14px 20px;font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:3px;text-transform:uppercase;cursor:pointer;transition:all .3s;overflow:hidden}
+.tbtn:hover{border-color:rgba(192,24,43,.9);box-shadow:0 0 25px var(--glow-red);transform:translateY(-1px)}
+.tbtn.bl{background:linear-gradient(135deg,rgba(26,58,122,.85),rgba(15,35,80,.95));border-color:rgba(42,90,176,.5)}
+.tbtn.bl:hover{border-color:rgba(42,90,176,.9);box-shadow:0 0 25px var(--glow-blue)}
+.tbtn.gl{background:linear-gradient(135deg,#8b6820,var(--gold),#8b6820);border-color:var(--gold);color:#0d0b14;font-weight:700}
+.tbtn.gl:hover{box-shadow:0 0 30px var(--glow-gold);transform:translateY(-2px)}
+.tbtn:disabled{opacity:.35;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+
+/* LOBBY */
+#lobby-screen{flex-direction:column;align-items:stretch;padding:0;overflow:hidden}
+.sh{font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:4px;color:var(--gold);opacity:.6;text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:8px}
+
+/* LOBBY TOP BAR */
+.lb-topbar{display:flex;align-items:center;padding:14px 28px;background:rgba(6,5,10,.98);border-bottom:1px solid var(--border);gap:20px;flex-shrink:0}
+.lb-logo{font-family:'Cinzel Decorative',serif;font-size:1.1rem;font-weight:900;color:var(--gold2);letter-spacing:2px;text-shadow:0 0 15px var(--glow-gold)}
+.lb-sep{width:1px;height:24px;background:var(--border)}
+.rc-inline{display:flex;align-items:center;gap:10px}
+.rc-label{font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:3px;color:var(--gold);opacity:.6;text-transform:uppercase}
+.rc-code{font-family:'Cinzel Decorative',serif;font-size:1.6rem;font-weight:900;color:var(--gold2);letter-spacing:8px;text-shadow:0 0 15px var(--glow-gold);cursor:pointer;transition:all .2s}
+.rc-code:hover{text-shadow:0 0 25px var(--glow-gold),0 0 50px var(--glow-gold)}
+.rc-copy{font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:2px;color:var(--muted);padding:4px 10px;border:1px solid var(--border);cursor:pointer;transition:all .2s}
+.rc-copy:hover{border-color:var(--gold);color:var(--gold)}
+.lb-start-wrap{margin-left:auto;display:flex;align-items:center;gap:14px}
+.lb-pcount{font-family:'Cinzel',serif;font-size:.7rem;letter-spacing:2px;color:var(--muted)}
+.lb-pcount span{color:var(--gold2);font-size:.9rem}
+
+/* LOBBY MAIN AREA */
+.lb-main{flex:1;display:grid;grid-template-columns:1fr 340px;overflow:hidden;min-height:0}
+
+/* LEFT: Characters + Players */
+.lb-center{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border)}
+
+/* CHARACTER SHOWCASE */
+.char-showcase{flex-shrink:0;padding:20px 28px 0;display:flex;align-items:flex-end;gap:0;justify-content:center;height:200px;position:relative;overflow:hidden}
+.char-showcase::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(6,5,10,.95) 100%);z-index:2;pointer-events:none}
+.char-showcase::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);z-index:3}
+
+.char-card{position:relative;cursor:pointer;transition:transform .3s cubic-bezier(.34,1.56,.64,1);z-index:1;flex-shrink:0}
+.char-card:hover{transform:translateY(-12px) scale(1.05);z-index:10}
+.char-card.char-hitler{transform:scale(1.12);z-index:5}
+.char-card.char-hitler:hover{transform:scale(1.18) translateY(-8px);z-index:10}
+
+.char-svg-wrap{width:100px;height:160px;position:relative}
+.char-name-tag{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);font-family:'Cinzel',serif;font-size:.5rem;letter-spacing:2px;text-transform:uppercase;padding:3px 8px;border:1px solid;white-space:nowrap;z-index:4;opacity:0;transition:opacity .2s}
+.char-card:hover .char-name-tag{opacity:1}
+.char-name-tag.cn-f{border-color:var(--red);color:#f08090;background:rgba(6,5,10,.9)}
+.char-name-tag.cn-h{border-color:var(--gold);color:var(--gold2);background:rgba(6,5,10,.9)}
+.char-name-tag.cn-l{border-color:var(--blue2);color:#7ab0ff;background:rgba(6,5,10,.9)}
+
+/* PLAYERS SECTION */
+.lb-players-section{flex:1;overflow-y:auto;padding:16px 28px 20px}
+.lb-players{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:12px}
+@keyframes cardIn{from{opacity:0;transform:scale(.9) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.lpc{background:rgba(0,0,0,.45);border:1px solid var(--border);padding:14px 10px;text-align:center;position:relative;animation:cardIn .4s cubic-bezier(.16,1,.3,1) both;transition:all .2s}
+.lpc:hover{border-color:rgba(212,168,67,.5);background:rgba(212,168,67,.04)}
+.lpc.lp-host{border-color:rgba(212,168,67,.55);background:rgba(212,168,67,.06)}
+.lpc.lp-me{border-color:rgba(76,175,80,.45);background:rgba(76,175,80,.04)}
+.lpa{width:48px;height:48px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-family:'Cinzel Decorative',serif;font-size:1.1rem;font-weight:900;color:rgba(255,255,255,.9);position:relative}
+.lpa::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:1px solid transparent;transition:border-color .2s}
+.lpc.lp-host .lpa::after{border-color:var(--gold)}
+.lpa-num{position:absolute;bottom:-2px;right:-2px;width:16px;height:16px;border-radius:50%;background:var(--bg2);border:1px solid var(--border);font-size:.5rem;font-family:'Cinzel',serif;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.lpn{font-family:'Cinzel',serif;font-size:.68rem;letter-spacing:1px;color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lpb{display:inline-block;margin-top:5px;font-size:.48rem;letter-spacing:2px;text-transform:uppercase;padding:2px 6px;border:1px solid}
+.lpb.bh{border-color:var(--gold);color:var(--gold)}.lpb.bm{border-color:#4caf50;color:#4caf50}
+
+/* RIGHT: Stats panel */
+.lb-right{display:flex;flex-direction:column;overflow-y:auto;background:rgba(6,5,10,.98)}
+
+/* Role distribution */
+.role-dist{padding:20px 22px;border-bottom:1px solid var(--border)}
+.role-dist-title{font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:4px;color:var(--gold);opacity:.6;text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:16px}
+.role-cards{display:flex;flex-direction:column;gap:10px}
+.role-distcard{padding:14px;border:1px solid;position:relative;overflow:hidden;transition:all .3s}
+.role-distcard::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px}
+.role-distcard.rdc-f{border-color:rgba(192,24,43,.35);background:rgba(192,24,43,.06)}
+.role-distcard.rdc-f::before{background:var(--red)}
+.role-distcard.rdc-h{border-color:rgba(212,168,67,.35);background:rgba(212,168,67,.06)}
+.role-distcard.rdc-h::before{background:var(--gold)}
+.role-distcard.rdc-l{border-color:rgba(42,90,176,.35);background:rgba(42,90,176,.06)}
+.role-distcard.rdc-l::before{background:var(--blue2)}
+.rdc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.rdc-name{font-family:'Cinzel',serif;font-size:.7rem;letter-spacing:2px}
+.rdc-f .rdc-name{color:#f08090}.rdc-h .rdc-name{color:var(--gold2)}.rdc-l .rdc-name{color:#7ab0ff}
+.rdc-count{font-family:'Cinzel Decorative',serif;font-size:1.3rem;font-weight:900}
+.rdc-f .rdc-count{color:#f08090}.rdc-h .rdc-count{color:var(--gold2)}.rdc-l .rdc-count{color:#7ab0ff}
+.rdc-bar{height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+.rdc-bar-fill{height:100%;border-radius:2px;transition:width .6s cubic-bezier(.34,1.56,.64,1)}
+.rdc-f .rdc-bar-fill{background:linear-gradient(90deg,var(--red2),var(--red))}
+.rdc-h .rdc-bar-fill{background:linear-gradient(90deg,#a07830,var(--gold))}
+.rdc-l .rdc-bar-fill{background:linear-gradient(90deg,var(--blue),var(--blue2))}
+.rdc-desc{font-size:.72rem;color:var(--muted);font-style:italic;margin-top:6px;line-height:1.5}
+
+/* Game rules */
+.game-rules{padding:18px 22px;border-bottom:1px solid var(--border)}
+.rules-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.rule-item{display:flex;gap:10px;align-items:flex-start}
+.rule-icon{font-size:.9rem;flex-shrink:0;margin-top:1px}
+.rule-text{font-size:.78rem;color:var(--muted);line-height:1.5}
+.rule-text strong{color:var(--cream);font-style:normal}
+
+/* Win conditions */
+.win-conds{padding:18px 22px}
+.wc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.wc{padding:12px;border:1px solid;text-align:center}
+.wc.wc-l{border-color:rgba(42,90,176,.35);background:rgba(42,90,176,.06)}
+.wc.wc-f{border-color:rgba(192,24,43,.35);background:rgba(192,24,43,.06)}
+.wc-title{font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+.wc-l .wc-title{color:#7ab0ff}.wc-f .wc-title{color:#f08090}
+.wc-cond{font-size:.7rem;color:var(--muted);line-height:1.6}
+.rc-big{font-family:'Cinzel Decorative',serif;font-size:2.2rem;font-weight:900;color:var(--gold2);letter-spacing:10px;text-shadow:0 0 20px var(--glow-gold)}
+
+/* HUD */
+.g-hud{display:flex;align-items:center;padding:11px 22px;background:rgba(6,5,10,.97);border-bottom:1px solid var(--border);gap:18px;flex-shrink:0;z-index:20}
+.hud-logo{font-family:'Cinzel Decorative',serif;font-size:.95rem;font-weight:900;color:var(--gold2);letter-spacing:2px;text-shadow:0 0 15px var(--glow-gold);flex-shrink:0}
+.hud-sep{width:1px;height:22px;background:var(--border);flex-shrink:0}
+.hs{display:flex;flex-direction:column;align-items:center;gap:1px}
+.hs-v{font-family:'Cinzel',serif;font-size:1.05rem;color:var(--gold2);font-weight:700}
+.hs-l{font-size:.5rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.hud-phase{margin-left:auto;font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:4px;text-transform:uppercase;padding:4px 12px;border:1px solid var(--border);color:var(--gold)}
+.myrole{font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:2px;padding:4px 10px;border:1px solid}
+.myrole.liberal{border-color:rgba(42,90,176,.6);color:#5a9af0}.myrole.fascist{border-color:rgba(192,24,43,.6);color:#f06a70}.myrole.hitler{border-color:rgba(212,168,67,.6);color:var(--gold2)}
+
+/* GAME LAYOUT */
+.g-main{flex:1;display:grid;grid-template-columns:260px 1fr 280px;overflow:hidden;min-height:0}
+.g-left{background:rgba(6,5,10,.97);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:18px 14px;gap:14px;overflow-y:auto}
+.g-right{background:rgba(6,5,10,.97);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.g-center{display:flex;flex-direction:column;overflow:hidden;background:radial-gradient(ellipse at 50% 30%,rgba(139,15,30,.05) 0%,transparent 60%)}
+
+/* TRACKS */
+.tc{padding:13px;position:relative}
+.tc.ft{background:linear-gradient(135deg,rgba(139,15,30,.22),rgba(60,5,12,.38));border:1px solid rgba(192,24,43,.32)}
+.tc.lt{background:linear-gradient(135deg,rgba(26,58,122,.22),rgba(10,25,70,.38));border:1px solid rgba(42,90,176,.32)}
+.th{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.tn{font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:3px;text-transform:uppercase}
+.ft .tn{color:#f06a70}.lt .tn{color:#5a9af0}
+.tc-n{font-family:'Cinzel',serif;font-size:.95rem;color:var(--gold2)}
+.pips{display:flex;gap:5px}
+.pip{flex:1;height:34px;border-radius:3px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:.85rem;transition:all .5s cubic-bezier(.34,1.56,.64,1);position:relative}
+.pip.ff{background:linear-gradient(135deg,#8b0f1e,#5c0810);border-color:var(--red);box-shadow:0 0 10px var(--glow-red);animation:pop .5s cubic-bezier(.34,1.56,.64,1)}
+.pip.lf{background:linear-gradient(135deg,#1a3a7a,#0d2050);border-color:var(--blue2);box-shadow:0 0 10px var(--glow-blue);animation:pop .5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+.pip-pw{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:.44rem;color:var(--gold);letter-spacing:.5px;text-align:center;white-space:nowrap}
+
+/* TRACKER */
+.trk{padding:11px 13px;background:rgba(0,0,0,.3);border:1px solid var(--border)}
+.trk-row{display:flex;align-items:center;gap:8px;margin-top:7px}
+.trk-dot{width:18px;height:18px;border-radius:50%;border:1px solid rgba(212,168,67,.3);background:rgba(0,0,0,.4);transition:all .4s}
+.trk-dot.ta{background:var(--red);border-color:var(--red);box-shadow:0 0 10px var(--glow-red);animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
+
+/* ARENA */
+.arena{flex:1;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:13px;padding:20px;overflow-y:auto}
+.pc{width:105px;background:rgba(10,8,16,.92);border:1px solid var(--border);padding:14px 9px 11px;text-align:center;cursor:pointer;transition:all .3s cubic-bezier(.34,1.56,.64,1);position:relative;overflow:hidden;animation:cardIn .4s cubic-bezier(.16,1,.3,1) both}
+.pc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--border);transition:background .3s}
+.pc:hover:not(.pd):not(.pm){transform:translateY(-6px) scale(1.04);border-color:rgba(212,168,67,.6);box-shadow:0 12px 40px rgba(0,0,0,.6),0 0 20px var(--glow-gold)}
+.pc:hover:not(.pd):not(.pm)::before{background:var(--gold)}
+.pc.pp{border-color:rgba(212,168,67,.65);box-shadow:0 0 20px var(--glow-gold)}.pc.pp::before{background:var(--gold)}
+.pc.pch{border-color:rgba(42,90,176,.65);box-shadow:0 0 20px var(--glow-blue)}.pc.pch::before{background:var(--blue2)}
+.pc.pd{opacity:.28;filter:grayscale(1) brightness(.5);cursor:default}
+.pc.pm{border-color:rgba(76,175,80,.45)}.pc.pm::before{background:rgba(76,175,80,.5)}
+.pc.pt:hover{border-color:rgba(192,24,43,.8)!important;box-shadow:0 12px 40px rgba(0,0,0,.6),0 0 25px var(--glow-red)!important}
+.pc.pt:hover::before{background:var(--red)!important}
+.pc-av-wrap{position:relative;width:56px;height:56px;margin:0 auto 9px}
+.pc-av{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Cinzel Decorative',serif;font-size:1.2rem;font-weight:900;color:rgba(255,255,255,.9);position:relative;z-index:1}
+.pc-ring{position:absolute;inset:-3px;border-radius:50%;border:2px solid transparent;transition:all .3s}
+.pp .pc-ring{border-color:var(--gold);box-shadow:0 0 10px var(--glow-gold);animation:rp 2s infinite}
+.pch .pc-ring{border-color:var(--blue2);box-shadow:0 0 10px var(--glow-blue);animation:rp 2s infinite}
+@keyframes rp{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.08);opacity:.7}}
+.pc-crown{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:.95rem;animation:fl 2s ease-in-out infinite}
+@keyframes fl{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-3px)}}
+.pc-name{font-family:'Cinzel',serif;font-size:.68rem;letter-spacing:1px;color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:5px}
+.pc-tags{display:flex;flex-direction:column;gap:3px;align-items:center}
+.pct{font-size:.48rem;letter-spacing:2px;text-transform:uppercase;padding:2px 6px;border:1px solid;display:inline-block}
+.pct.tp{border-color:var(--gold);color:var(--gold2)}.pct.tc2{border-color:var(--blue2);color:#7ab0ff}.pct.td{border-color:#555;color:#666}.pct.tm{border-color:#4caf50;color:#7ecf80}.pct.tf{border-color:var(--red);color:#f08090}.pct.th2{border-color:var(--gold);color:var(--gold2)}.pct.tl{border-color:var(--blue2);color:#7ab0ff}
+.pc-inv{position:absolute;top:5px;right:5px;font-size:.5rem;color:var(--gold);opacity:.7}
+
+/* ACTION BAR */
+.ab{background:rgba(6,5,10,.97);border-top:1px solid var(--border);padding:16px 22px;flex-shrink:0;min-height:115px}
+.ab-t{font-family:'Cinzel',serif;font-size:.82rem;letter-spacing:3px;color:var(--gold2);margin-bottom:5px;text-transform:uppercase}
+.ab-d{font-size:.88rem;color:var(--muted);font-style:italic;margin-bottom:11px}
+.ab-c{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.vg{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+.vcp{padding:5px 11px;font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:2px;border:1px solid var(--border);background:rgba(0,0,0,.4);transition:all .3s}
+.vcp.vj{border-color:rgba(42,90,176,.8);color:#7ab0ff;background:rgba(42,90,176,.14)}.vcp.vn{border-color:rgba(192,24,43,.8);color:#f08090;background:rgba(192,24,43,.14)}.vcp.vw{opacity:.5}
+.vb{display:flex;gap:12px}
+.bvb{padding:13px 34px;font-family:'Cinzel',serif;font-size:.95rem;letter-spacing:4px;text-transform:uppercase;border:2px solid;cursor:pointer;transition:all .25s;background:transparent}
+.bvb.ja{border-color:var(--blue2);color:#7ab0ff}.bvb.ja:hover{background:rgba(42,90,176,.22);box-shadow:0 0 30px var(--glow-blue);transform:scale(1.05)}
+.bvb.ne{border-color:var(--red);color:#f08090}.bvb.ne:hover{background:rgba(192,24,43,.22);box-shadow:0 0 30px var(--glow-red);transform:scale(1.05)}
+.ph{display:flex;gap:15px}.phh{font-size:.75rem;color:var(--muted);font-style:italic;align-self:center}
+.phc{width:68px;height:102px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:1.7rem;cursor:pointer;border:2px solid transparent;transition:all .3s cubic-bezier(.34,1.56,.64,1);position:relative;overflow:hidden}
+.phc::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.1) 0%,transparent 50%);pointer-events:none}
+.phc:hover{transform:translateY(-16px) rotate(-3deg) scale(1.12)}
+.phc.fc{background:linear-gradient(160deg,#6b0f1a,#3d060e);border-color:var(--red);box-shadow:0 6px 20px rgba(192,24,43,.4)}.phc.fc:hover{box-shadow:0 20px 40px rgba(192,24,43,.6);border-color:#f44}
+.phc.lc{background:linear-gradient(160deg,#1a3a7a,#0d2050);border-color:var(--blue2);box-shadow:0 6px 20px rgba(42,90,176,.4)}.phc.lc:hover{box-shadow:0 20px 40px rgba(42,90,176,.6);border-color:#59f}
+
+/* RIGHT PANEL */
+.sp{padding:14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
+.sb{background:rgba(0,0,0,.4);border:1px solid var(--border);padding:9px;text-align:center}
+.sb-v{font-family:'Cinzel',serif;font-size:1.3rem;font-weight:700;color:var(--gold2)}
+.sb-l{font-size:.5rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.sb.rs .sb-v{color:#f08090}.sb.bs .sb-v{color:#7ab0ff}.sb.gs .sb-v{color:#7ecf80}
+.lp2{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:14px;gap:9px}
+.ls{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+.le{font-size:.78rem;line-height:1.65;color:var(--muted);padding:4px 8px;border-left:2px solid transparent;transition:all .2s}
+.le:last-child{color:var(--cream);border-left-color:var(--gold);background:rgba(212,168,67,.04)}
+.le.lf2{border-left-color:var(--red);color:#f08090}.le.ll2{border-left-color:var(--blue2);color:#7ab0ff}.le.lk{border-left-color:#f44;color:#f09090}.le.lpw{border-left-color:var(--gold);color:var(--gold2)}
+
+/* GAMEOVER */
+#gameover-screen{flex-direction:column;gap:22px;text-align:center;padding:40px}
+.go-r{font-family:'Cinzel Decorative',serif;font-size:clamp(2rem,6vw,5rem);font-weight:900;animation:fadeUp .8s cubic-bezier(.16,1,.3,1) both}
+.go-r.liberal{color:#5a9af0;text-shadow:0 0 40px rgba(42,90,176,.8)}.go-r.fascist{color:var(--red);text-shadow:0 0 40px var(--glow-red)}
+.go-rs{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;max-width:700px}
+.go-rc{padding:11px 17px;border:1px solid;font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:1px;animation:cardIn .4s cubic-bezier(.16,1,.3,1) both}
+.go-rc.liberal{border-color:rgba(42,90,176,.6);color:#7ab0ff}.go-rc.fascist{border-color:rgba(192,24,43,.6);color:#f08090}.go-rc.hitler{border-color:rgba(212,168,67,.6);color:var(--gold2)}
+.go-btns{display:flex;gap:12px}
+
+/* OVERLAY */
+.ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+.ov.hidden{display:none}
+.ovb{background:linear-gradient(160deg,#0d0b14,#06050a);border:1px solid rgba(212,168,67,.4);padding:46px;text-align:center;max-width:460px;width:90%;position:relative;animation:ovIn .4s cubic-bezier(.16,1,.3,1)}
+@keyframes ovIn{from{opacity:0;transform:scale(.88) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.ovb::before,.ovb::after{content:'';position:absolute;width:20px;height:20px;border-color:var(--gold);border-style:solid}
+.ovb::before{top:8px;left:8px;border-width:1px 0 0 1px}.ovb::after{bottom:8px;right:8px;border-width:0 1px 1px 0}
+.oi{font-size:3.8rem;margin-bottom:14px}.ot{font-family:'Cinzel Decorative',serif;font-size:1.7rem;color:var(--gold2);margin-bottom:11px;letter-spacing:2px}.ox{color:var(--text);line-height:1.8;margin-bottom:26px;font-style:italic;font-size:1.02rem;white-space:pre-line}
+
+/* TOAST */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:rgba(139,15,30,.95);border:1px solid rgba(192,24,43,.6);color:var(--cream);padding:9px 22px;font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:2px;z-index:200;animation:tu .3s ease;box-shadow:0 0 30px var(--glow-red)}
+@keyframes tu{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:rgba(0,0,0,.3)}::-webkit-scrollbar-thumb{background:rgba(212,168,67,.3);border-radius:2px}
+#cd{position:fixed;top:12px;right:12px;z-index:50;width:7px;height:7px;border-radius:50%;transition:all .3s}
+#cd.on{background:#4caf50;box-shadow:0 0 8px #4caf50}#cd.off{background:var(--red);box-shadow:0 0 8px var(--glow-red)}
+@media(max-width:900px){.g-main{grid-template-columns:1fr}.g-left,.g-right{display:none}}
+@media(max-width:600px){.lb-left{width:100%;border-right:none;border-bottom:1px solid var(--border)}#lobby-screen{flex-direction:column}}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div id="cd" class="off"></div>
+
+<!-- TITLE -->
+<div id="title-screen" class="screen active">
+  <div class="title-logo">
+    <p class="t-tfo">TFO Edition</p>
+    <span class="t-secret">Secret</span>
+    <span class="t-main">HITLER</span>
+    <div class="t-div"></div>
+    <p class="t-sub">Verschwörung · Täuschung · Macht</p>
+  </div>
+  <div class="title-form">
+    <div class="ig"><label>Dein Name</label><input class="fi" id="ni" placeholder="Wie soll man dich nennen?" maxlength="20"></div>
+    <button class="tbtn" onclick="createRoom()">⚑ Neues Spiel erstellen</button>
+    <div class="div-or">oder</div>
+    <div class="ig"><label>Raumcode</label><input class="fi code" id="ci" placeholder="XXXXX" maxlength="10"></div>
+    <button class="tbtn bl" onclick="joinRoom()">☮ Raum beitreten</button>
+  </div>
+</div>
+
+<!-- LOBBY -->
+<div id="lobby-screen" class="screen">
+  <!-- TOP BAR -->
+  <div class="lb-topbar">
+    <span class="lb-logo">SH:TFO</span>
+    <div class="lb-sep"></div>
+    <div class="rc-inline">
+      <span class="rc-label">Raumcode</span>
+      <span class="rc-code" id="lc" title="Klicken zum Kopieren" onclick="copyCode()">-----</span>
+      <span class="rc-copy" onclick="copyCode()">📋 Kopieren</span>
+    </div>
+    <div class="lb-sep"></div>
+    <div class="lb-start-wrap">
+      <span class="lb-pcount"><span id="lcount">0</span>/10 Spieler</span>
+      <button class="tbtn gl" id="lsb" onclick="startGame()" disabled style="width:auto;padding:10px 24px">⚑ Spiel Starten</button>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="lb-main">
+    <!-- CENTER: Characters + Players -->
+    <div class="lb-center">
+      <!-- CHARACTER SHOWCASE -->
+      <div class="char-showcase" id="char-showcase">
+        <!-- SVG characters injected by JS -->
+      </div>
+
+      <!-- PLAYERS -->
+      <div class="lb-players-section">
+        <p class="sh">Mitspieler</p>
+        <div class="lb-players" id="lplayers"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Info Panel -->
+    <div class="lb-right">
+      <!-- Role distribution -->
+      <div class="role-dist">
+        <p class="role-dist-title">Rollenverteilung</p>
+        <div class="role-cards" id="role-dist-cards">
+          <div class="role-distcard rdc-h">
+            <div class="rdc-header">
+              <span class="rdc-name">🎭 Hitler</span>
+              <span class="rdc-count" id="rd-h">1</span>
+            </div>
+            <div class="rdc-bar"><div class="rdc-bar-fill" id="rd-h-bar" style="width:10%"></div></div>
+            <p class="rdc-desc">Immer genau 1 Hitler. Wird Kanzler nach 3+ faschistischen Gesetzen → Faschisten gewinnen!</p>
+          </div>
+          <div class="role-distcard rdc-f">
+            <div class="rdc-header">
+              <span class="rdc-name">⚑ Faschisten</span>
+              <span class="rdc-count" id="rd-f">?</span>
+            </div>
+            <div class="rdc-bar"><div class="rdc-bar-fill" id="rd-f-bar" style="width:20%"></div></div>
+            <p class="rdc-desc">Kennen Hitler & andere Faschisten. Helfen Hitler heimlich an die Macht.</p>
+          </div>
+          <div class="role-distcard rdc-l">
+            <div class="rdc-header">
+              <span class="rdc-name">☮ Liberale</span>
+              <span class="rdc-count" id="rd-l">?</span>
+            </div>
+            <div class="rdc-bar"><div class="rdc-bar-fill" id="rd-l-bar" style="width:60%"></div></div>
+            <p class="rdc-desc">Kennen niemanden. Müssen Hitler finden und töten oder 5 liberale Gesetze verabschieden.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Win conditions -->
+      <div class="win-conds">
+        <p class="role-dist-title">Siegbedingungen</p>
+        <div class="wc-grid">
+          <div class="wc wc-l">
+            <div class="wc-title">☮ Liberale</div>
+            <div class="wc-cond">5 lib. Gesetze<br>— oder —<br>Hitler erschießen</div>
+          </div>
+          <div class="wc wc-f">
+            <div class="wc-title">⚑ Faschisten</div>
+            <div class="wc-cond">6 fasch. Gesetze<br>— oder —<br>Hitler als Kanzler</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rules -->
+      <div class="game-rules">
+        <p class="role-dist-title">Spielablauf</p>
+        <div class="rules-list">
+          <div class="rule-item"><span class="rule-icon">🏛</span><span class="rule-text"><strong>Nominierung:</strong> Präsident wählt einen Kanzler</span></div>
+          <div class="rule-item"><span class="rule-icon">🗳</span><span class="rule-text"><strong>Abstimmung:</strong> Alle stimmen Ja/Nein ab</span></div>
+          <div class="rule-item"><span class="rule-icon">📜</span><span class="rule-text"><strong>Gesetzgebung:</strong> Präsident → Kanzler wählen Gesetze</span></div>
+          <div class="rule-item"><span class="rule-icon">⚡</span><span class="rule-text"><strong>Sondermächte:</strong> Ab 3 fasch. Gesetzen aktiv</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game-screen" class="screen">
+  <div class="g-hud">
+    <span class="hud-logo">SH:TFO</span>
+    <div class="hud-sep"></div>
+    <div style="display:flex;gap:18px;align-items:center;flex:1">
+      <div class="hs"><span class="hs-v" id="hr">1</span><span class="hs-l">Runde</span></div>
+      <div class="hud-sep"></div>
+      <div class="hs"><span class="hs-v" style="color:#f08090" id="hf">0</span><span class="hs-l">Fasch.</span></div>
+      <div class="hs"><span class="hs-v" style="color:#7ab0ff" id="hl">0</span><span class="hs-l">Liberal</span></div>
+      <div class="hud-sep"></div>
+      <div class="hs"><span class="hs-v" id="ha">?</span><span class="hs-l">Leben</span></div>
+    </div>
+    <div class="hud-phase" id="hp">-</div>
+    <div class="myrole" id="mr" style="display:none"></div>
+  </div>
+  <div class="g-main">
+    <div class="g-left">
+      <div class="tc ft">
+        <div class="th"><span class="tn">⚑ Faschistische Gesetze</span><span class="tc-n" id="fc">0/6</span></div>
+        <div class="pips" id="fp"></div>
+      </div>
+      <div class="tc lt">
+        <div class="th"><span class="tn">☮ Liberale Gesetze</span><span class="tc-n" id="lc2">0/5</span></div>
+        <div class="pips" id="lp"></div>
+      </div>
+      <div class="trk">
+        <p class="sh" style="margin-bottom:7px">Wahl-Tracker</p>
+        <div class="trk-row" id="tr"></div>
+        <p style="font-size:.6rem;color:var(--muted);margin-top:7px;font-style:italic">3 Fehlschläge → Auto-Gesetz</p>
+      </div>
+      <div>
+        <p class="sh" style="margin-bottom:9px">Spieler-Status</p>
+        <div id="psl" style="display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+    </div>
+    <div class="g-center">
+      <div class="arena" id="arena"></div>
+      <div class="ab">
+        <p class="ab-t" id="abt">Warte…</p>
+        <p class="ab-d" id="abd"></p>
+        <div class="ab-c" id="abc"></div>
+      </div>
+    </div>
+    <div class="g-right">
+      <div class="sp">
+        <p class="sh">Live-Statistiken</p>
+        <div class="sg">
+          <div class="sb rs"><div class="sb-v" id="sdead">0</div><div class="sb-l">Gestorben</div></div>
+          <div class="sb bs"><div class="sb-v" id="salive">0</div><div class="sb-l">Am Leben</div></div>
+          <div class="sb rs"><div class="sb-v" id="sfp">0</div><div class="sb-l">Fasch. Gesetze</div></div>
+          <div class="sb bs"><div class="sb-v" id="slp">0</div><div class="sb-l">Lib. Gesetze</div></div>
+          <div class="sb"><div class="sb-v" id="srnd">1</div><div class="sb-l">Runde</div></div>
+          <div class="sb gs"><div class="sb-v" id="svotes">0</div><div class="sb-l">Abstimmungen</div></div>
+        </div>
+      </div>
+      <div class="lp2">
+        <p class="sh">Chronik</p>
+        <div class="ls" id="ls"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GAMEOVER -->
+<div id="gameover-screen" class="screen">
+  <p class="go-r" id="gor">-</p>
+  <p style="font-size:1.05rem;color:var(--muted);font-style:italic" id="goreason">-</p>
+  <div class="t-div" style="width:380px;max-width:90vw"></div>
+  <p style="font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:4px;color:var(--gold);opacity:.7">ROLLEN ENTHÜLLUNG</p>
+  <div class="go-rs" id="gors"></div>
+  <div class="go-btns">
+    <button class="tbtn gl" id="gaBtn" onclick="playAgain()" style="max-width:190px;display:none">Nochmal spielen</button>
+    <button class="tbtn bl" onclick="goHome()" style="max-width:190px">Zum Menü</button>
+  </div>
+</div>
+
+<!-- OVERLAY -->
+<div class="ov hidden" id="ov">
+  <div class="ovb">
+    <div class="oi" id="oi">🏛</div>
+    <div class="ot" id="ot"></div>
+    <div class="ox" id="ox"></div>
+    <button class="tbtn gl" onclick="closeOverlay()" style="max-width:180px;margin:0 auto">Weiter</button>
+  </div>
+</div>
+
+<script>
+// BG CANVAS
+(function(){
+  const c=document.getElementById('bg-canvas'),ctx=c.getContext('2d');
+  let W,H,pts=[];
+  function resize(){W=c.width=innerWidth;H=c.height=innerHeight}
+  function mkP(){return{x:Math.random()*W,y:Math.random()*H,s:Math.random()*1.4+.3,vy:-(Math.random()*.28+.04),vx:(Math.random()-.5)*.1,o:Math.random()*.35+.05,col:Math.random()>.7?'#d4a843':'#c0182b'}}
+  for(let i=0;i<70;i++)pts.push(mkP());
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    pts.forEach(p=>{
+      ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,Math.PI*2);
+      ctx.fillStyle=p.col;ctx.globalAlpha=p.o;ctx.fill();
+      p.y+=p.vy;p.x+=p.vx;
+      if(p.y<-5||p.x<-5||p.x>W+5)Object.assign(p,mkP(),{y:H+5});
+    });
+    ctx.globalAlpha=1;requestAnimationFrame(draw);
+  }
+  addEventListener('resize',resize);resize();draw();
+})();
+
+// SOCKET
+const socket=io();
+let myId=null,myName='',gameState=null,overlayCb=null,totalVotes=0;
+
+socket.on('connect',()=>{myId=socket.id;document.getElementById('cd').className='on'});
+socket.on('disconnect',()=>document.getElementById('cd').className='off');
+socket.on('error',msg=>toast(msg));
+socket.on('roomCreated',({code})=>{document.getElementById('lc').textContent=code;show('lobby-screen')});
+socket.on('roomJoined',({code})=>{document.getElementById('lc').textContent=code;show('lobby-screen')});
+socket.on('gameState',state=>{
+  gameState=state;
+  if(state.phase==='lobby'){renderLobby(state);show('lobby-screen')}
+  else if(state.phase==='gameover'){renderGO(state);show('gameover-screen')}
+  else{show('game-screen');renderGame(state)}
+});
+
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+
+const AC=[['#8b0f1e','#5c0810'],['#1a3a7a','#0d2050'],['#1a5a1a','#0d3a0d'],['#5a4a1a','#3a2e0d'],['#4a1a6b','#2d0d44'],['#1a5a5a','#0d3a3a'],['#7a3a1a','#4a2010'],['#5a1a4a','#3a0d2e'],['#2a4a7a','#162e50'],['#6b1a1a','#440d0d']];
+const avStyle=i=>{const[a,b]=AC[i%AC.length];return`background:linear-gradient(135deg,${a},${b})`};
+
+// COPY CODE
+function copyCode(){
+  const code=document.getElementById('lc').textContent;
+  navigator.clipboard.writeText(code).then(()=>toast('Code kopiert: '+code)).catch(()=>toast('Code: '+code));
+}
+
+// CHARACTER SVGs
+const CHARS=[
+  {role:'liberal',name:'Der Liberale',color:'#2a5ab0',glow:'rgba(42,90,176,.6)',
+   svg:`<svg viewBox="0 0 100 160" width="100" height="160" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="lg1" cx="50%" cy="30%"><stop offset="0%" stop-color="#3a6ad4"/><stop offset="100%" stop-color="#1a3a7a"/></radialGradient></defs>
+    <!-- Robe -->
+    <ellipse cx="50" cy="130" rx="30" ry="35" fill="#1a3a7a" opacity=".9"/>
+    <rect x="25" y="95" width="50" height="55" rx="8" fill="url(#lg1)"/>
+    <!-- Collar -->
+    <path d="M35 95 L50 108 L65 95" fill="none" stroke="#7ab0ff" stroke-width="1.5" opacity=".8"/>
+    <!-- Badge -->
+    <circle cx="50" cy="115" r="6" fill="none" stroke="#7ab0ff" stroke-width="1"/>
+    <text x="50" y="118" text-anchor="middle" font-size="6" fill="#7ab0ff">☮</text>
+    <!-- Arms -->
+    <line x1="25" y1="100" x2="12" y2="125" stroke="#1a3a7a" stroke-width="10" stroke-linecap="round"/>
+    <line x1="75" y1="100" x2="88" y2="125" stroke="#1a3a7a" stroke-width="10" stroke-linecap="round"/>
+    <!-- Scroll in hand -->
+    <rect x="84" y="118" width="12" height="16" rx="2" fill="#ede0c4" opacity=".8"/>
+    <line x1="84" y1="122" x2="96" y2="122" stroke="#1a3a7a" stroke-width=".8"/>
+    <line x1="84" y1="126" x2="96" y2="126" stroke="#1a3a7a" stroke-width=".8"/>
+    <!-- Neck -->
+    <rect x="44" y="80" width="12" height="18" rx="4" fill="#d4a878"/>
+    <!-- Head -->
+    <circle cx="50" cy="68" r="18" fill="#d4a878"/>
+    <!-- Hair -->
+    <ellipse cx="50" cy="52" rx="18" ry="10" fill="#3d2810"/>
+    <!-- Eyes -->
+    <circle cx="44" cy="66" r="2.5" fill="#1a3a7a"/><circle cx="56" cy="66" r="2.5" fill="#1a3a7a"/>
+    <circle cx="44.8" cy="65.2" r="1" fill="white"/><circle cx="56.8" cy="65.2" r="1" fill="white"/>
+    <!-- Smile -->
+    <path d="M44 73 Q50 78 56 73" fill="none" stroke="#8b5e3c" stroke-width="1.2"/>
+    <!-- Glow -->
+    <ellipse cx="50" cy="155" rx="25" ry="5" fill="#2a5ab0" opacity=".3"/>
+   </svg>`},
+  {role:'fascist',name:'Der Faschist',color:'#8b0f1e',glow:'rgba(192,24,43,.6)',
+   svg:`<svg viewBox="0 0 100 160" width="100" height="160" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="fg1" cx="50%" cy="30%"><stop offset="0%" stop-color="#c0182b"/><stop offset="100%" stop-color="#5c0810"/></radialGradient></defs>
+    <!-- Coat -->
+    <rect x="22" y="93" width="56" height="57" rx="6" fill="url(#fg1)"/>
+    <!-- Buttons -->
+    <circle cx="50" cy="105" r="2" fill="#d4a843"/><circle cx="50" cy="115" r="2" fill="#d4a843"/><circle cx="50" cy="125" r="2" fill="#d4a843"/>
+    <!-- Shoulder epaulettes -->
+    <rect x="16" y="93" width="16" height="8" rx="3" fill="#d4a843" opacity=".8"/>
+    <rect x="68" y="93" width="16" height="8" rx="3" fill="#d4a843" opacity=".8"/>
+    <!-- Arms -->
+    <line x1="22" y1="100" x2="8" y2="128" stroke="#5c0810" stroke-width="12" stroke-linecap="round"/>
+    <line x1="78" y1="100" x2="92" y2="128" stroke="#5c0810" stroke-width="12" stroke-linecap="round"/>
+    <!-- Fist -->
+    <circle cx="9" cy="132" r="7" fill="#d4a878"/>
+    <!-- Neck -->
+    <rect x="44" y="78" width="12" height="18" rx="4" fill="#d4a878"/>
+    <!-- Head -->
+    <circle cx="50" cy="66" r="19" fill="#c49060"/>
+    <!-- Military hat -->
+    <rect x="28" y="48" width="44" height="10" rx="3" fill="#3d0a0a"/>
+    <rect x="32" y="38" width="36" height="14" rx="3" fill="#5c0810"/>
+    <rect x="38" y="43" width="24" height="5" rx="1" fill="#d4a843" opacity=".6"/>
+    <!-- Hat badge -->
+    <polygon points="50,40 52,45 57,45 53,48 55,53 50,50 45,53 47,48 43,45 48,45" fill="#d4a843" opacity=".8"/>
+    <!-- Eyes - intense -->
+    <circle cx="44" cy="67" r="3" fill="#1a0505"/><circle cx="56" cy="67" r="3" fill="#1a0505"/>
+    <circle cx="44.8" cy="66.2" r="1.2" fill="white"/><circle cx="56.8" cy="66.2" r="1.2" fill="white"/>
+    <!-- Stern frown -->
+    <path d="M44 74 Q50 71 56 74" fill="none" stroke="#8b5e3c" stroke-width="1.2"/>
+    <!-- Scar -->
+    <line x1="57" y1="60" x2="60" y2="70" stroke="#8b3020" stroke-width="1" opacity=".6"/>
+    <!-- Glow -->
+    <ellipse cx="50" cy="155" rx="25" ry="5" fill="#c0182b" opacity=".3"/>
+   </svg>`},
+  {role:'hitler',name:'Hitler',color:'#d4a843',glow:'rgba(212,168,67,.7)',
+   svg:`<svg viewBox="0 0 100 160" width="110" height="176" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="hg1" cx="50%" cy="30%"><stop offset="0%" stop-color="#8b0f1e"/><stop offset="100%" stop-color="#3d0505"/></radialGradient>
+      <filter id="hglow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <!-- Shadow/aura -->
+    <ellipse cx="50" cy="155" rx="32" ry="8" fill="#d4a843" opacity=".2"/>
+    <!-- Dramatic coat -->
+    <path d="M18 95 L15 150 L85 150 L82 95 Z" fill="url(#hg1)"/>
+    <path d="M18 95 L30 150" stroke="#d4a843" stroke-width=".8" opacity=".4"/>
+    <path d="M82 95 L70 150" stroke="#d4a843" stroke-width=".8" opacity=".4"/>
+    <!-- Red armband -->
+    <rect x="14" y="110" width="14" height="12" rx="2" fill="#8b0f1e"/>
+    <rect x="16" y="113" width="10" height="6" rx="1" fill="#d4a843" opacity=".8"/>
+    <!-- Iron cross medal -->
+    <rect x="44" y="108" width="12" height="12" rx="1" fill="#1a1a1a"/>
+    <line x1="50" y1="108" x2="50" y2="120" stroke="#d4a843" stroke-width="2"/>
+    <line x1="44" y1="114" x2="56" y2="114" stroke="#d4a843" stroke-width="2"/>
+    <!-- Arms -->
+    <line x1="20" y1="100" x2="5" y2="130" stroke="#3d0505" stroke-width="13" stroke-linecap="round"/>
+    <line x1="80" y1="100" x2="95" y2="130" stroke="#3d0505" stroke-width="13" stroke-linecap="round"/>
+    <!-- Raised fist (right) -->
+    <circle cx="94" cy="124" r="8" fill="#c49060"/>
+    <!-- Neck -->
+    <rect x="44" y="76" width="12" height="22" rx="4" fill="#c49060"/>
+    <!-- Head -->
+    <ellipse cx="50" cy="62" rx="20" ry="22" fill="#c49060"/>
+    <!-- Dark hair -->
+    <path d="M30 55 Q35 38 50 36 Q65 38 70 55 Q65 44 50 42 Q35 44 30 55Z" fill="#1a1205"/>
+    <path d="M30 52 Q28 58 30 62" fill="none" stroke="#1a1205" stroke-width="3"/>
+    <!-- Gold crown/halo effect -->
+    <circle cx="50" cy="38" r="16" fill="none" stroke="#d4a843" stroke-width=".8" opacity=".4" filter="url(#hglow)"/>
+    <!-- Intense eyes -->
+    <ellipse cx="43" cy="61" rx="3.5" ry="3" fill="#0a0505"/>
+    <ellipse cx="57" cy="61" rx="3.5" ry="3" fill="#0a0505"/>
+    <circle cx="44" cy="60" r="1.3" fill="white"/><circle cx="58" cy="60" r="1.3" fill="white"/>
+    <!-- Mustache (iconic small) -->
+    <rect x="46" y="70" width="8" height="5" rx="1" fill="#1a1205"/>
+    <!-- Smirk -->
+    <path d="M43 76 Q47 79 50 77 Q53 75 57 76" fill="none" stroke="#8b5e3c" stroke-width="1"/>
+    <!-- Gold aura lines -->
+    <line x1="50" y1="20" x2="50" y2="14" stroke="#d4a843" stroke-width="1" opacity=".5"/>
+    <line x1="34" y1="25" x2="30" y2="20" stroke="#d4a843" stroke-width="1" opacity=".4"/>
+    <line x1="66" y1="25" x2="70" y2="20" stroke="#d4a843" stroke-width="1" opacity=".4"/>
+   </svg>`},
+  {role:'liberal',name:'Die Liberale',color:'#2a5ab0',glow:'rgba(42,90,176,.6)',
+   svg:`<svg viewBox="0 0 100 160" width="95" height="152" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="lg2" cx="50%" cy="30%"><stop offset="0%" stop-color="#3a6ad4"/><stop offset="100%" stop-color="#1a3a7a"/></radialGradient></defs>
+    <!-- Skirt/dress -->
+    <path d="M30 100 L15 150 L85 150 L70 100Z" fill="#1a3a7a" opacity=".9"/>
+    <!-- Blouse -->
+    <rect x="28" y="85" width="44" height="25" rx="6" fill="url(#lg2)"/>
+    <!-- Peace sign brooch -->
+    <circle cx="50" cy="95" r="5" fill="none" stroke="#7ab0ff" stroke-width="1"/>
+    <line x1="50" y1="90" x2="50" y2="100" stroke="#7ab0ff" stroke-width=".8"/>
+    <line x1="50" y1="100" x2="46" y2="105" stroke="#7ab0ff" stroke-width=".8"/>
+    <line x1="50" y1="100" x2="54" y2="105" stroke="#7ab0ff" stroke-width=".8"/>
+    <!-- Arms -->
+    <line x1="28" y1="92" x2="12" y2="115" stroke="#1a3a7a" stroke-width="9" stroke-linecap="round"/>
+    <line x1="72" y1="92" x2="88" y2="115" stroke="#1a3a7a" stroke-width="9" stroke-linecap="round"/>
+    <!-- Book in hand -->
+    <rect x="84" y="110" width="12" height="14" rx="1" fill="#ede0c4"/>
+    <rect x="84" y="110" width="3" height="14" rx="1" fill="#7ab0ff" opacity=".6"/>
+    <!-- Neck -->
+    <rect x="44" y="72" width="12" height="16" rx="4" fill="#e8c090"/>
+    <!-- Head -->
+    <ellipse cx="50" cy="60" rx="17" ry="20" fill="#e8c090"/>
+    <!-- Long hair -->
+    <path d="M33 55 Q30 75 33 90" stroke="#3d2810" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <path d="M67 55 Q70 75 67 90" stroke="#3d2810" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <ellipse cx="50" cy="44" rx="18" ry="12" fill="#3d2810"/>
+    <!-- Eyes -->
+    <ellipse cx="44" cy="60" rx="3" ry="2.5" fill="#2a5ab0"/>
+    <ellipse cx="56" cy="60" rx="3" ry="2.5" fill="#2a5ab0"/>
+    <circle cx="44.8" cy="59.2" r="1" fill="white"/><circle cx="56.8" cy="59.2" r="1" fill="white"/>
+    <!-- Smile -->
+    <path d="M44 67 Q50 72 56 67" fill="none" stroke="#8b5e3c" stroke-width="1.2"/>
+    <!-- Glow -->
+    <ellipse cx="50" cy="155" rx="22" ry="4" fill="#2a5ab0" opacity=".25"/>
+   </svg>`},
+  {role:'fascist',name:'Der Geheime Faschist',color:'#8b0f1e',glow:'rgba(192,24,43,.5)',
+   svg:`<svg viewBox="0 0 100 160" width="95" height="152" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="fg2" cx="50%" cy="30%"><stop offset="0%" stop-color="#a01525"/><stop offset="100%" stop-color="#4a0810"/></radialGradient></defs>
+    <!-- Cloak -->
+    <path d="M20 92 L10 150 L90 150 L80 92 Q65 85 50 88 Q35 85 20 92Z" fill="url(#fg2)" opacity=".95"/>
+    <!-- Cloak details -->
+    <path d="M50 88 L50 150" stroke="#d4a843" stroke-width=".5" opacity=".3"/>
+    <!-- Hidden symbol under cloak -->
+    <text x="50" y="130" text-anchor="middle" font-size="16" fill="#d4a843" opacity=".2">⚑</text>
+    <!-- Collar up (suspicious) -->
+    <path d="M30 92 Q50 100 70 92" fill="#3d0505" stroke="#8b0f1e" stroke-width="1"/>
+    <!-- Arms -->
+    <line x1="22" y1="100" x2="8" y2="128" stroke="#4a0810" stroke-width="11" stroke-linecap="round"/>
+    <line x1="78" y1="100" x2="92" y2="128" stroke="#4a0810" stroke-width="11" stroke-linecap="round"/>
+    <!-- Neck -->
+    <rect x="44" y="76" width="12" height="18" rx="4" fill="#c8905e"/>
+    <!-- Head -->
+    <circle cx="50" cy="64" r="18" fill="#c8905e"/>
+    <!-- Hat (wide brim, shadowy) -->
+    <ellipse cx="50" cy="48" rx="24" ry="5" fill="#1a0505"/>
+    <rect x="34" y="36" width="32" height="15" rx="3" fill="#2d0505"/>
+    <!-- Shadow across eyes from hat -->
+    <rect x="33" y="57" width="34" height="8" rx="2" fill="#0a0505" opacity=".5"/>
+    <!-- Glowing eyes from shadow -->
+    <circle cx="43" cy="61" r="3" fill="#c0182b" opacity=".8"/>
+    <circle cx="57" cy="61" r="3" fill="#c0182b" opacity=".8"/>
+    <circle cx="43" cy="61" r="1.5" fill="#ff6060"/><circle cx="57" cy="61" r="1.5" fill="#ff6060"/>
+    <!-- Sinister smile -->
+    <path d="M43 71 Q50 68 57 71" fill="none" stroke="#8b3020" stroke-width="1.2"/>
+    <!-- Glow ground -->
+    <ellipse cx="50" cy="155" rx="22" ry="4" fill="#c0182b" opacity=".25"/>
+   </svg>`},
+];
+
+function renderCharShowcase(){
+  const sc=document.getElementById('char-showcase');
+  if(!sc)return;
+  // Order: liberal, fascist, HITLER (center), fascist, liberal
+  const order=[0,1,2,3,4];
+  sc.innerHTML=order.map((ci,i)=>{
+    const ch=CHARS[ci];
+    const isHitler=ch.role==='hitler';
+    const delay=i*0.08;
+    return `<div class="char-card char-${ch.role}" style="animation:fadeUp .6s ${delay}s cubic-bezier(.16,1,.3,1) both;filter:drop-shadow(0 0 12px ${ch.glow})">
+      <div class="char-svg-wrap">${ch.svg}</div>
+      <div class="char-name-tag cn-${ch.role==='hitler'?'h':ch.role==='fascist'?'f':'l'}">${ch.name}</div>
+    </div>`;
+  }).join('');
+}
+
+const ROLE_CONFIGS={5:{h:1,f:1,l:3},6:{h:1,f:1,l:4},7:{h:1,f:2,l:4},8:{h:1,f:2,l:5},9:{h:1,f:3,l:5},10:{h:1,f:3,l:6}};
+
+function updateRoleDist(count){
+  const cfg=ROLE_CONFIGS[Math.min(10,Math.max(5,count))]||{h:1,f:'?',l:'?'};
+  const total=count||5;
+  document.getElementById('rd-h').textContent=cfg.h;
+  document.getElementById('rd-f').textContent=cfg.f;
+  document.getElementById('rd-l').textContent=cfg.l;
+  document.getElementById('rd-h-bar').style.width=`${(cfg.h/total)*100}%`;
+  document.getElementById('rd-f-bar').style.width=`${(cfg.f/total)*100}%`;
+  document.getElementById('rd-l-bar').style.width=`${(cfg.l/total)*100}%`;
+}
+
+function renderLobby(state){
+  document.getElementById('lcount').textContent=state.players.length;
+  const btn=document.getElementById('lsb');
+  btn.disabled=state.players.length<5||state.hostId!==myId;
+  btn.textContent=state.hostId!==myId?'⏳ Warte auf Host…':'⚑ Spiel Starten';
+  renderCharShowcase();
+  updateRoleDist(state.players.length);
+  document.getElementById('lplayers').innerHTML=state.players.map((p,i)=>`
+    <div class="lpc${p.id===state.hostId?' lp-host':''}${p.id===myId?' lp-me':''}">
+      <div class="lpa" style="${avStyle(i)}">
+        ${p.name[0].toUpperCase()}
+        <span class="lpa-num">${i+1}</span>
+      </div>
+      <div class="lpn">${p.name}</div>
+      <div style="display:flex;gap:4px;justify-content:center;margin-top:5px;flex-wrap:wrap">
+        ${p.id===state.hostId?'<span class="lpb bh">⚜ Host</span>':''}
+        ${p.id===myId?'<span class="lpb bm">Du</span>':''}
+      </div>
+    </div>`).join('');
+}
+
+const FPW={5:[null,null,null,'Untersuchen','Sonderwahl','☠ Töten'],6:[null,null,null,'Untersuchen','Sonderwahl','☠ Töten'],7:[null,null,'Untersuchen','☠ Töten','Sonderwahl','☠ Töten'],8:[null,null,'Untersuchen','☠ Töten','Sonderwahl','☠ Töten'],9:[null,'Untersuchen','Untersuchen','☠ Töten','Sonderwahl','☠ Töten'],10:[null,'Untersuchen','Untersuchen','☠ Töten','Sonderwahl','☠ Töten']};
+
+function renderGame(state){
+  const n=Math.min(10,Math.max(5,state.players.length)),pw=FPW[n];
+  document.getElementById('hr').textContent=state.round;
+  document.getElementById('hf').textContent=state.fascistPolicies;
+  document.getElementById('hl').textContent=state.liberalPolicies;
+  document.getElementById('ha').textContent=state.aliveCount;
+  const pm={nominate:'NOMINIERUNG',vote:'ABSTIMMUNG',president_discard:'PRÄS. WÄHLT',chancellor_discard:'KANZL. WÄHLT',power:'SONDERMACHT'};
+  document.getElementById('hp').textContent=pm[state.phase]||'';
+  const re=document.getElementById('mr');
+  if(state.myRole){re.style.display='';const rm={liberal:'☮ Liberal',fascist:'⚑ Faschist',hitler:'🎭 Hitler'};re.textContent=rm[state.myRole];re.className='myrole '+state.myRole}
+
+  // F pips
+  document.getElementById('fc').textContent=`${state.fascistPolicies}/6`;
+  const fp=document.getElementById('fp');fp.innerHTML='';
+  for(let i=0;i<6;i++){const d=document.createElement('div');d.className='pip'+(i<state.fascistPolicies?' ff':'');d.textContent=i<state.fascistPolicies?'⚑':'';if(pw[i]){const s=document.createElement('span');s.className='pip-pw';s.textContent=pw[i];d.appendChild(s)}fp.appendChild(d)}
+
+  // L pips
+  document.getElementById('lc2').textContent=`${state.liberalPolicies}/5`;
+  const lp=document.getElementById('lp');lp.innerHTML='';
+  for(let i=0;i<5;i++){const d=document.createElement('div');d.className='pip'+(i<state.liberalPolicies?' lf':'');d.textContent=i<state.liberalPolicies?'☮':'';lp.appendChild(d)}
+
+  // Tracker
+  const tr=document.getElementById('tr');tr.innerHTML='';
+  for(let i=0;i<3;i++){const d=document.createElement('div');d.className='trk-dot'+(i<state.electionTracker?' ta':'');tr.appendChild(d)}
+
+  // Stats
+  const dead=state.players.filter(p=>!p.alive).length;
+  document.getElementById('sdead').textContent=dead;
+  document.getElementById('salive').textContent=state.aliveCount;
+  document.getElementById('sfp').textContent=state.fascistPolicies;
+  document.getElementById('slp').textContent=state.liberalPolicies;
+  document.getElementById('srnd').textContent=state.round;
+  if(state.phase==='vote')totalVotes=Math.max(totalVotes,state.voteCount);
+  document.getElementById('svotes').textContent=totalVotes;
+
+  // Sidebar player list
+  document.getElementById('psl').innerHTML=state.players.map((p,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid ${!p.alive?'rgba(255,255,255,.05)':'var(--border)'};background:rgba(0,0,0,${!p.alive?.08:.3});opacity:${!p.alive?.38:1}">
+      <div style="width:22px;height:22px;border-radius:50%;${avStyle(i)};display:flex;align-items:center;justify-content:center;font-family:'Cinzel Decorative',serif;font-size:.6rem;flex-shrink:0">${p.name[0].toUpperCase()}</div>
+      <span style="font-size:.68rem;color:var(--cream);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
+      ${p.id===state.presidentId?'<span style="font-size:.46rem;color:var(--gold);letter-spacing:1px">PRÄS</span>':''}
+      ${p.id===state.chancellorId?'<span style="font-size:.46rem;color:#7ab0ff;letter-spacing:1px">KANZL</span>':''}
+      ${!p.alive?'<span style="font-size:.46rem;color:#555;letter-spacing:1px">☠</span>':''}
+    </div>`).join('');
+
+  // Arena
+  const amPres=state.presidentId===myId;
+  const isTP=(state.phase==='nominate'&&amPres)||(state.phase==='power'&&amPres&&!state.investigateResult);
+  document.getElementById('arena').innerHTML=state.players.map((p,i)=>{
+    const ip=p.id===state.presidentId,ic=p.id===state.chancellorId,im=p.id===myId,cc=isTP&&!im&&p.alive;
+    let cl='pc';
+    if(ip)cl+=' pp';if(ic)cl+=' pch';if(!p.alive)cl+=' pd';if(im)cl+=' pm';if(cc)cl+=' pt';
+    let tags='';
+    if(ip)tags+='<span class="pct tp">Präsident</span>';if(ic)tags+='<span class="pct tc2">Kanzler</span>';
+    if(im)tags+='<span class="pct tm">Du</span>';if(!p.alive)tags+='<span class="pct td">☠ Tot</span>';
+    if(p.role==='fascist')tags+='<span class="pct tf">Faschist</span>';if(p.role==='hitler')tags+='<span class="pct th2">Hitler</span>';
+    if(p.role==='liberal'&&im)tags+='<span class="pct tl">Liberal</span>';
+    const crown=ip?'<span class="pc-crown">👑</span>':ic?'<span class="pc-crown">⚜</span>':'';
+    return `<div class="${cl}" onclick="pClick('${p.id}')">${crown}<div class="pc-av-wrap"><div class="pc-av" style="${avStyle(i)}">${p.name[0].toUpperCase()}</div><div class="pc-ring"></div></div><div class="pc-name">${p.name}</div><div class="pc-tags">${tags}</div>${p.investigated?'<div class="pc-inv">🔍</div>':''}</div>`;
+  }).join('');
+
+  renderAction(state);
+
+  // Log
+  const ls=document.getElementById('ls');
+  const wb=ls.scrollTop+ls.clientHeight>=ls.scrollHeight-20;
+  ls.innerHTML=state.log.map(e=>{
+    let cl='le';
+    if(e.msg.includes('⚑'))cl+=' lf2';else if(e.msg.includes('☮'))cl+=' ll2';else if(e.msg.includes('☠'))cl+=' lk';else if(e.msg.includes('⚡')||e.msg.includes('🔍'))cl+=' lpw';
+    return`<div class="${cl}">${e.msg}</div>`;
+  }).join('');
+  if(wb)ls.scrollTop=ls.scrollHeight;
+}
+
+function renderAction(state){
+  const abt=document.getElementById('abt'),abd=document.getElementById('abd'),abc=document.getElementById('abc');
+  abc.innerHTML='';
+  const pres=state.players.find(p=>p.id===state.presidentId);
+  const chan=state.chancellorId?state.players.find(p=>p.id===state.chancellorId):null;
+  const ap=state.presidentId===myId,ac=state.chancellorId===myId;
+
+  if(state.phase==='nominate'){
+    abt.textContent=`${pres?.name} nominiert einen Kanzler`;
+    abd.textContent=ap?'Klicke auf einen Spieler in der Arena um ihn als Kanzler zu nominieren.':`Warte auf ${pres?.name}…`;
+  }else if(state.phase==='vote'){
+    abt.textContent=`Abstimmung: ${pres?.name} & ${chan?.name}`;
+    abd.textContent='Stimme jetzt ab!';
+    const vg=document.createElement('div');vg.className='vg';
+    state.players.filter(p=>p.alive).forEach(p=>{
+      const c=document.createElement('div');c.className='vcp';
+      if(p.id===myId&&state.myVote==='ja'){c.classList.add('vj');c.textContent=`✓ ${p.name}`}
+      else if(p.id===myId&&state.myVote==='nein'){c.classList.add('vn');c.textContent=`✗ ${p.name}`}
+      else{c.classList.add('vw');c.textContent=p.name}
+      vg.appendChild(c);
+    });
+    abc.appendChild(vg);
+    if(!state.myVote){
+      const vb=document.createElement('div');vb.className='vb';
+      vb.innerHTML='<button class="bvb ja" onclick="vote(\'ja\')">Ja!</button><button class="bvb ne" onclick="vote(\'nein\')">Nein!</button>';
+      abc.appendChild(vb);
+    }else{
+      const w=document.createElement('p');w.style.cssText='font-size:.85rem;color:var(--muted);font-style:italic';
+      w.textContent=`Du hast "${state.myVote==='ja'?'Ja':'Nein'}" gestimmt. Warte auf ${state.aliveCount-state.voteCount} weitere…`;
+      abc.appendChild(w);
+    }
+  }else if(state.phase==='president_discard'){
+    abt.textContent=ap?'Wähle eine Karte ab':`${pres?.name} wählt eine Karte ab`;
+    abd.textContent=ap?'Die gewählte Karte wird abgeworfen. Die anderen 2 gehen an den Kanzler.':`Warte auf den Präsidenten…`;
+    if(ap&&state.hand)renderHand(abc,state.hand,'presidentDiscard','Klicke auf die Karte die du ABWERFEN möchtest');
+  }else if(state.phase==='chancellor_discard'){
+    abt.textContent=ac?'Verabschiede ein Gesetz':`${chan?.name} wählt ein Gesetz`;
+    abd.textContent=ac?'Klicke auf das Gesetz das verabschiedet werden soll.':`Warte auf den Kanzler…`;
+    if(ac&&state.hand)renderHand(abc,state.hand,'chancellorEnact','Klicke auf die Karte die du VERABSCHIEDEN möchtest');
+  }else if(state.phase==='power'){
+    const ptl={kill:'☠ Exekution',investigate:'🔍 Partei-Untersuchung',special_election:'⚡ Sonderwahl'};
+    const pds={kill:'Wähle einen Spieler zum Erschießen. Ist es Hitler? Liberale gewinnen!',investigate:'Untersuche die Parteizugehörigkeit eines Spielers.',special_election:'Wähle den nächsten Präsidenten.'};
+    if(ap){
+      if(state.investigateResult){
+        abt.textContent='🔍 Untersuchungsergebnis';
+        abd.textContent=`${state.investigateResult.targetName} gehört der Partei: ${state.investigateResult.party}`;
+        const b=document.createElement('button');b.className='tbtn gl';b.style.maxWidth='175px';b.textContent='Verstanden ✓';b.onclick=()=>socket.emit('investigateDone');abc.appendChild(b);
+      }else{abt.textContent=ptl[state.power]||'Sondermacht';abd.textContent=(pds[state.power]||'')+' Klicke einen Spieler in der Arena an.'}
+    }else{abt.textContent=`${pres?.name} nutzt Sondermacht`;abd.textContent='Warte…'}
+  }
+}
+
+function renderHand(c,hand,action,hint){
+  const h=document.createElement('p');h.className='phh';h.style.marginRight='8px';h.textContent=hint;
+  const hd=document.createElement('div');hd.className='ph';
+  hand.forEach((card,i)=>{
+    const b=document.createElement('div');b.className=`phc ${card==='fascist'?'fc':'lc'}`;b.textContent=card==='fascist'?'⚑':'☮';
+    b.onclick=()=>socket.emit(action,{cardIndex:i});hd.appendChild(b);
+  });
+  c.appendChild(h);c.appendChild(hd);
+}
+
+function pClick(tid){
+  if(!gameState)return;
+  if(gameState.phase==='nominate'&&gameState.presidentId===myId)socket.emit('nominate',{targetId:tid});
+  else if(gameState.phase==='power'&&gameState.presidentId===myId&&!gameState.investigateResult)socket.emit('usePower',{targetId:tid});
+}
+function vote(v){socket.emit('vote',{vote:v})}
+
+function renderGO(state){
+  const r=document.getElementById('gor');r.className='go-r '+state.winner;r.textContent=state.winner==='liberal'?'☮ Liberale Gewinnen!':'⚑ Faschisten Gewinnen!';
+  document.getElementById('goreason').textContent=state.winReason;
+  document.getElementById('gors').innerHTML=state.players.map(p=>`<div class="go-rc ${p.role}">${p.name}<br><span style="opacity:.7">${p.role==='liberal'?'☮ Liberal':p.role==='fascist'?'⚑ Faschist':'🎭 Hitler'}</span></div>`).join('');
+  document.getElementById('gaBtn').style.display=state.hostId===myId?'block':'none';
+}
+function playAgain(){socket.emit('playAgain')}
+function goHome(){show('title-screen')}
+function closeOverlay(){document.getElementById('ov').classList.add('hidden');if(overlayCb){const c=overlayCb;overlayCb=null;c()}}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3000)}
+function createRoom(){const n=document.getElementById('ni').value.trim();if(!n){toast('Bitte gib einen Namen ein!');return}myName=n;socket.emit('createRoom',{name:n})}
+function joinRoom(){const n=document.getElementById('ni').value.trim(),c=document.getElementById('ci').value.trim().toUpperCase();if(!n){toast('Bitte gib einen Namen ein!');return}if(!c){toast('Bitte gib einen Raumcode ein!');return}myName=n;socket.emit('joinRoom',{name:n,code:c})}
+function startGame(){socket.emit('startGame')}
+document.getElementById('ni').addEventListener('keypress',e=>{if(e.key==='Enter'){const c=document.getElementById('ci').value.trim();c?joinRoom():createRoom()}});
+document.getElementById('ci').addEventListener('keypress',e=>{if(e.key==='Enter')joinRoom()});
+</script>
+</body>
+</html>
